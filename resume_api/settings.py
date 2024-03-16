@@ -15,7 +15,6 @@ import os
 from decouple import config
 
 
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -24,15 +23,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY')
+SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 if DEBUG:
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "diverse-intense-whippet.ngrok-free.app"]
 else:
-    ALLOWED_HOSTS = ["resume-api-pink.vercel.app"]
+    ALLOWED_HOSTS = ["osamaaslam.pythonanywhere.com"]
 
 
 # Application definition
@@ -45,6 +44,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "resume",
+    "Homepage",
+    "i",
     "api_auth",
     "rest_framework",
     "django_extensions",
@@ -52,12 +53,15 @@ INSTALLED_APPS = [
     "crispy_forms",
     "crispy_bootstrap5",
     "rest_framework_simplejwt",
-    "drf_spectacular"
+    "drf_spectacular",
+    # "corsheaders"
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # "resume_api.cors.CustomCorsMiddleware",
+    # "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -91,12 +95,11 @@ WSGI_APPLICATION = "resume_api.wsgi.application"
 if DEBUG:
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.mysql",
-            "OPTIONS": {
-                "read_default_file": "/path/to/my.cnf",
-            },
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",  # Path to your SQLite database file
         }
     }
+
 else:
     DATABASES = {
         "default": {
@@ -104,11 +107,11 @@ else:
             "NAME": config("POSTGRES_DATABASE"),
             "USER": config("POSTGRES_USER"),
             "PASSWORD": config("POSTGRES_PASSWORD"),
-            "HOST":  config("POSTGRES_HOST"),
+            "HOST": config("POSTGRES_HOST"),
             "PORT": "5432",
             "OPTIONS": {
                 "sslmode": "require",
-            }
+            },
         }
     }
 
@@ -152,86 +155,113 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
 
 
+###########################Security Related Settings########################################
+
+# Uncomment these settings only in production
+if not DEBUG:
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = "DENY"
+    SECURE_SSL_REDIRECT = True
+
+###############################Set Login rate limit For Users#############################
+AXES_FAILURE_LIMIT = 15  # Number of login attempts allowed before blocking
+AXES_LOCK_OUT_AT_FAILURE = False
+AXES_COOLOFF_TIME = 0.001
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = True
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://127.0.0.1",
+        "http://localhost",
+        "https://diverse-intense-whippet.ngrok-free.app",
+    ]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "https://osamaaslam.pythonanywhere.com",  # authenticate teh request only, checking if it has CSRF token comming here from django-e-commrace
+        "https://osama11111.pythonanywhere.com",
+        "https://vercel-3-5-2024.vercel.app",
+        "https://web.postman.co",
+    ]
+
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-if DEBUG:
-    CSRF_TRUSTED_ORIGINS = ["127.0.0.1", "localhost", "diverse-intense-whippet.ngrok-free.app"]
-else:
-   CSRF_TRUSTED_ORIGINS = ["https://resume-api-pink.vercel.app"]
+AUTH_USER_MODEL = "api_auth.CustomUser"
+LOGIN_REDIRECT_URL = "/"
+LOGIN_URL = "/login/"
+CKEDITOR_BASEPATH = "/static/ckeditor/ckeditor/"
 
-
-# crispy form
-CRISPY_TEMPLATE_PACK = "bootstrap5"
-CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+################################Session and Cookie Settings#######################################33
+SESSION_COOKIE_AGE = 7200000
+SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_HTTPONLY = True
 
 
 # cloudinary storages
-# CLOUDINARY_STORAGE = {
-#     "CLOUD_NAME": "dh8vfw5u0",
-#     "API_KEY": "667912285456865",
-#     "API_SECRET": "QaF0OnEY-W1v2GufFKdOjo3KQm8",
-# }
-# DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-
-# User Model
-AUTH_USER_MODEL = "api_auth.CustomUser"
-
-
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": "dh8vfw5u0",
+    "API_KEY": "667912285456865",
+    "API_SECRET": "QaF0OnEY-W1v2GufFKdOjo3KQm8",
+}
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 
 #  Stateless Authentication
-# In stateless authentication, the server doesn't keep track of the user's state (session). 
-# Each request from the client must contain all the information necessary to authenticate the user, 
+# In stateless authentication, the server doesn't keep track of the user's state (session).
+# Each request from the client must contain all the information necessary to authenticate the user,
 # including the JWT token. The server verifies this token on every request to ensure the user is authenticated.
 
 # How to Use JWT Stateless Authentication in Django Rest Framework?
-# In Django Rest Framework, you've configured the rest_framework_simplejwt.authentication.JWTStatelessUserAuthentication 
+# In Django Rest Framework, you've configured the rest_framework_simplejwt.authentication.JWTStatelessUserAuthentication
 # as one of the default authentication classes. This means that any request coming to your API endpoints
 #  needs to include a valid JWT token in the request headers for authentication.
 
 # Checking Token Validity
-# When a request comes in, Django Rest Framework automatically checks the JWT token provided 
-# in the request headers. It verifies the token's signature to ensure it hasn't been tampered with. 
-# If the signature is valid and the token hasn't expired, the request is considered authenticated, 
+# When a request comes in, Django Rest Framework automatically checks the JWT token provided
+# in the request headers. It verifies the token's signature to ensure it hasn't been tampered with.
+# If the signature is valid and the token hasn't expired, the request is considered authenticated,
 # and Django Rest Framework proceeds with processing the request.
 
 # Handling Authentication Errors
-# If the token is missing or invalid, Django Rest Framework returns an authentication error, 
-# indicating that the user is not authenticated. It's then up to the client-side application 
-# to handle this error appropriately, usually by prompting the user to log in again or refreshing 
+# If the token is missing or invalid, Django Rest Framework returns an authentication error,
+# indicating that the user is not authenticated. It's then up to the client-side application
+# to handle this error appropriately, usually by prompting the user to log in again or refreshing
 # the token if it has expired.
 
-REST_FRAMEWORK = { # when this settings is not present, ModelSetets will use default classes 
-                   # for Authentication, Meta-data, Permission etc Hint: those in mentioned in classy DRF
-    # 'DEFAULT_AUTHENTICATION_CLASSES': (
-    #     'rest_framework_simplejwt.authentication.JWTStatelessUserAuthentication'),
-
-    # 'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated'),
-    # 'DEFAULT_METADATA_CLASS': 'api_auth.custom_meta_data_class.CustomMetadata',
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema'
+REST_FRAMEWORK = {
+    # 'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTStatelessUserAuthentication'),
+    # 'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema"
 }
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'My API',
-    'DESCRIPTION': 'API documentation for My API',
-    'VERSION': '1.0.0'
+    "TITLE": "My API",
+    "DESCRIPTION": "API documentation for My API",
+    "VERSION": "1.0.0",
 }
 
 
-
-# Authorization: JWTs can contain claims (such as user roles or permissions) 
+# Authorization: JWTs can contain claims (such as user roles or permissions)
 # to authorize access to certain resources.
-# JWTs consist of three parts: a header, a payload, and a signature. 
+# JWTs consist of three parts: a header, a payload, and a signature.
 # They are encoded as base64 strings and separated by dots (.).
 from datetime import timedelta
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=250),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=10),
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": False,
-
     "ALGORITHM": "HS256",
     "SIGNING_KEY": "django-insecure-o_j80u+4owpa-&!$%&j&n@r0d6&)9kbutwi!m&j-v*b(ems*=d",
     "VERIFYING_KEY": "",
@@ -240,21 +270,16 @@ SIMPLE_JWT = {
     "JSON_ENCODER": None,
     "JWK_URL": None,
     "LEEWAY": 0,
-
     "AUTH_HEADER_TYPES": ("Bearer",),
     "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
     "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
-
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",
     "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
-
     "JTI_CLAIM": "jti",
-
     "TOKEN_OBTAIN_SERIALIZER": "api_auth.serializers.TokenClaimObtainPairSerializer",
     "TOKEN_REFRESH_SERIALIZER": "rest_framework_simplejwt.serializers.TokenRefreshSerializer",
     "TOKEN_VERIFY_SERIALIZER": "rest_framework_simplejwt.serializers.TokenVerifySerializer",
-
 }
