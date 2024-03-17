@@ -29,9 +29,9 @@ SECRET_KEY = config("SECRET_KEY")
 DEBUG = True
 
 if DEBUG:
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "diverse-intense-whippet.ngrok-free.app"]
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "diverse-intense-whippet.ngrok-free.app", "ecommracapi.pythonanywhere.com"]
 else:
-    ALLOWED_HOSTS = ["osamaaslam.pythonanywhere.com"]
+    ALLOWED_HOSTS = ['ecommracapi.pythonanywhere.com']
 
 
 # Application definition

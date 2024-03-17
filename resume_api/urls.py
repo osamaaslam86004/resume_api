@@ -26,6 +26,7 @@ from resume.views import Homepage
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("Homepage/", include("Homepage.urls")),
     path("", Homepage.as_view(), name ="Homepage"),
     path("api/", include("resume.urls")),
     path("api/auth/", include("api_auth.urls")),
@@ -36,4 +37,3 @@ urlpatterns = [
 ]
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-  
