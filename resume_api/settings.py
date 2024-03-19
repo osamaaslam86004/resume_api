@@ -29,9 +29,14 @@ SECRET_KEY = config("SECRET_KEY")
 DEBUG = True
 
 if DEBUG:
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "diverse-intense-whippet.ngrok-free.app", "ecommracapi.pythonanywhere.com"]
+    ALLOWED_HOSTS = [
+        "127.0.0.1",
+        "localhost",
+        "diverse-intense-whippet.ngrok-free.app",
+        "ecommracapi.pythonanywhere.com",
+    ]
 else:
-    ALLOWED_HOSTS = ['ecommracapi.pythonanywhere.com']
+    ALLOWED_HOSTS = ["ecommracapi.pythonanywhere.com"]
 
 
 # Application definition
@@ -54,12 +59,16 @@ INSTALLED_APPS = [
     "crispy_bootstrap5",
     "rest_framework_simplejwt",
     "drf_spectacular",
+    "phonenumber_field",
+    "django_countries",
+    "silk",
     # "corsheaders"
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "silk.middleware.SilkyMiddleware",
     # "resume_api.cors.CustomCorsMiddleware",
     # "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -114,6 +123,15 @@ else:
             },
         }
     }
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "my_cache_table",
+    }
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

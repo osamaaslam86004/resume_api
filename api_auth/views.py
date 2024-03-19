@@ -1,7 +1,7 @@
 # from django.shortcuts import render
 from rest_framework import viewsets
 from rest_framework.views import APIView
-from api_auth.models import CustomUser
+from api_auth.models import CustomUser, SocialAccount
 from api_auth.serializers import UserSerializer, TokenClaimObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.response import Response
@@ -11,56 +11,14 @@ from rest_framework import status
 # from rest_framework_simplejwt.authentication import JWTStatelessUserAuthentication
 # from rest_framework.permissions import IsAuthenticated
 # from api_auth.custom_meta_data_class import CustomMetadata
-import jsonschema
-from jsonschema import ValidationError
-from api_auth.schemas import user_create_request_schema, user_create_response_schema
+# import jsonschema
+# from jsonschema import ValidationError
+from api_auth.schemas import CustomJSONParser, CustomJSONRenderer
+from api_auth.metadata import METADATA_CHECK_EMAIL
 from rest_framework.decorators import action
-import json
-from django.http import JsonResponse, HttpResponseBadRequest
-from django.views import View
-
-
-class checking_status(APIView):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.serializer_class = None
-
-    def post(self, request, *args, **kwargs):
-        if request.method == "POST":
-            try:
-                data = json.loads(request.body)
-                # Validate schema if needed (refer to external resources for schema validation)
-                # if not validate_schema(data):
-                #     return HttpResponseBadRequest({'message': 'Invalid JSON schema'})
-
-                # Assuming no external API call is required (based on prompt instructions)
-                # Process data or perform any necessary actions here
-
-                return JsonResponse(
-                    {
-                        "response_content": data,
-                        "headers": {"Content-type": "application/json"},
-                    }
-                )
-            except json.JSONDecodeError:
-                return HttpResponseBadRequest({"message": "Invalid JSON data"})
-        else:
-            return JsonResponse({"message": "Method not allowed"}, status=405)
-
-    def get(self, request, *args, **kwargs):
-        if request.method == "GET":
-            try:
-                data = {"key": "value"}
-                return JsonResponse(
-                    {
-                        "response_content": data,
-                        "headers": {"Content-type": "application/json"},
-                    }
-                )
-            except json.JSONDecodeError:
-                return HttpResponseBadRequest({"message": "Invalid JSON data"})
-        else:
-            return JsonResponse({"message": "Method not allowed"}, status=405)
+from rest_framework import serializers
+from django.core.cache import cache
+from datetime import timedelta
 
 
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -70,37 +28,11 @@ class MyTokenObtainPairView(TokenObtainPairView):
 class UserCreateView(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
+    parser_classes = [CustomJSONParser]
+    # renderer_classes = [CustomJSONRenderer]
 
     def list(self, request, *args, **kwargs):
         return Response(data={"error": "Method not allowed"})
-
-    def create(self, request, *args, **kwargs):
-        # Validate request data
-        try:
-            jsonschema.validate(request.data, user_create_request_schema)
-
-            # validate the type of each key e.g if is_active is boolean or not
-        except jsonschema.ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-            # confirms if all the fields mentioned in "required fields" are present in request.data
-        except jsonschema.SchemaError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Create user
-        response = super().create(request, *args, **kwargs)
-
-        # Validate response data
-        try:
-            jsonschema.validate(response.data, user_create_response_schema)
-        except ValidationError as e:
-            # Handle validation error
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        except jsonschema.SchemaError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return response
 
     @action(detail=False, methods=["GET"])
     def get_api_user_id_for_user(self, request, *args, **kwargs):
@@ -140,3 +72,78 @@ class UserCreateView(viewsets.ModelViewSet):
                     "values": "either email is None or password is None",
                 }
             )
+
+
+class CheckEmailExistence(APIView):
+    allowed_methods = ["POST"]
+    metadata_class = METADATA_CHECK_EMAIL
+
+    class EmailSerializer(serializers.Serializer):
+        email = serializers.EmailField()
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.EmailSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data.get("email")
+
+        # Check if the result is cached
+        cache_key = f"email_existence_{email}"
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return Response(cached_result, status=status.HTTP_200_OK)
+
+        existing_social_user = SocialAccount.objects.filter(
+            user_info__icontains=email
+        ).exists()
+        # Check if the user with the email already exists
+        existing_user = CustomUser.objects.filter(email=email).exists()
+
+        # Cache the results
+        result = {"exists": existing_social_user and existing_user, "email": email}
+        cache.set(cache_key, result, timeout=timedelta(days=1))
+
+        if existing_social_user and existing_user:
+            return Response({"exists": True, "email": email}, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {"exists": False, "email": email}, status=status.HTTP_404_NOT_FOUND
+            )
+
+
+# class SignupView(View):
+#     template_name = "signup.html"
+#     form_class = SignUpForm
+
+#     def get(self, request):
+#         form = self.form_class()
+#         return render(request, self.template_name, {"form": form})
+
+#     def post(self, request):
+#         email = request.POST.get(
+#             "email"
+#         )  # Assuming the email comes from the form POST data
+
+#         existing_social_user = SocialAccount.objects.select_related(
+#             user_info__icontains=email
+#         ).exists()
+#         # Check if the user with the email already exists
+#         existing_user = CustomUser.objects.select_related(email=email).exists()
+
+#         if existing_social_user or existing_user:
+#             messages.error(request, "A user with the email already exists")
+#             return redirect("Homepage:signup")
+#         else:
+#             form = self.form_class(request.POST)
+#             if form.is_valid():
+#                 user = form.save()
+#                 if user is not None:
+#                     messages.success(request, "your account is created, Please login!")
+#                     return redirect("Homepage:login")
+#             else:
+#                 for field, errors in form.errors.items():
+#                     for error in errors:
+#                         messages.error(request, f"{field}: {error}")
+
+#         return render(request, self.template_name, {"form": form})

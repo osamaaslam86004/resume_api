@@ -26,14 +26,16 @@ from resume.views import Homepage
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("Homepage/", include("Homepage.urls")),
-    path("", Homepage.as_view(), name ="Homepage"),
+    path("Homepage", include("Homepage.urls")),
+    # path("", Homepage.as_view(), name="Homepage"),
     path("api/", include("resume.urls")),
     path("api/auth/", include("api_auth.urls")),
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
-
-
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "api/schema/redoc/",
+        SpectacularRedocView.as_view(url_name="schema"),
+        name="redoc",
+    ),
 ]
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
+urlpatterns += [path("silk/", include("silk.urls", namespace="silk"))]
