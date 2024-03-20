@@ -154,3 +154,29 @@ class CustomLogoutView(APIView):
             print(f"user_id___________________{user_id}")
         logout(request)
         return Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
+
+
+class IsAuthenticatedCheck(APIView):
+    allowed_methods = ["GET"]
+
+    def get(self, request):
+        if request.session and "user_id" in request.session:
+            user_id = request.session["user_id"]
+            user_authenticated = CustomUser.objects.filter(id=user_id)[
+                0
+            ].is_authenticated
+            if user_authenticated:
+                return Response(
+                    {"user_authenticated": user_authenticated},
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                return Response(
+                    {"user_authenticated": user_authenticated},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+        else:
+            return Response(
+                {"session not found": "session not found"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

@@ -199,6 +199,7 @@ if DEBUG:
         "http://127.0.0.1",
         "http://localhost",
         "https://diverse-intense-whippet.ngrok-free.app",
+        "https://web.postman.co",
     ]
 else:
     CSRF_TRUSTED_ORIGINS = [

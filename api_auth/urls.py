@@ -6,6 +6,7 @@ from api_auth.views import (
     CheckEmailExistence,
     CustomLoginAPIView,
     CustomLogoutView,
+    IsAuthenticatedCheck,
 )
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenVerifyView
@@ -29,4 +30,5 @@ urlpatterns = [
     path("check-email/", CheckEmailExistence.as_view(), name="check_email_existence"),
     path("login-post/", CustomLoginAPIView.as_view(), name="login-post"),
     path("logout/", CustomLogoutView.as_view(), name="logout"),
+    path("is-authenticated/", IsAuthenticatedCheck.as_view(), name="is-authenticated"),
 ] + [path("", include(router.urls))]
