@@ -1,7 +1,11 @@
 from rest_framework import viewsets
 from rest_framework.views import APIView
-from api_auth.models import CustomUser, SocialAccount
-from api_auth.serializers import UserSerializer, TokenClaimObtainPairSerializer
+from api_auth.models import CustomUser, UserProfile, CustomerProfile
+from api_auth.serializers import (
+    UserSerializer,
+    TokenClaimObtainPairSerializer,
+    CustomerProfile,
+)
 from api_auth.fields import UIDB64TokenField
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.response import Response
@@ -331,3 +335,77 @@ class PostCustomPasswordResetConfirmView(APIView):
             user.set_password(password)
             user.save()
             return Response({"status": status.HTTP_200_OK})
+
+
+from django.shortcuts import get_object_or_404
+from .models import CustomUser, UserProfile, CustomerProfile
+from .serializers import (
+    CustomUserSerializer,
+    UserProfileSerializer,
+    CustomerProfileSerializer,
+)
+
+
+class CustomerProfilePageAPIView(APIView):
+    serializer_class = UserProfile
+    permission_classes = [IsAuthenticated, IsCustomer]
+
+    def get(self, request):
+        # Fetch user data
+        user = request.user
+        user = get_object_or_404(
+            CustomUser.objects.select_related("user_profile", "customer_profile"),
+            pk=request.user.pk,
+        )
+
+        # Serialize data
+        serializer = CustomUserSerializer(user)
+
+        return Response(serializer.data)
+
+        # Prepare response data
+        response_data = {
+            "user_profile": user_profile_serializer.data,
+            "customer_profile": customer_profile_serializer.data,
+            "custom_user_image": custom_user_image_serializer.data,
+        }
+
+        return Response(response_data)
+
+    def post(self, request):
+        # Fetch user data
+        user = request.user
+        custom_user = CustomUser.objects.get(pk=user.pk)
+        user_profile = UserProfile.objects.get(user=user)
+        customer_profile = CustomerProfile.objects.get(customer_profile=user_profile)
+
+        # Deserialize request data
+        user_profile_serializer = UserProfileSerializer(
+            instance=user_profile, data=request.data.get("user_profile")
+        )
+        customer_profile_serializer = CustomerProfileSerializer(
+            instance=customer_profile, data=request.data.get("customer_profile")
+        )
+        custom_user_image_serializer = CustomUserImageSerializer(
+            instance=custom_user, data=request.data.get("custom_user_image")
+        )
+
+        # Validate and save data
+        if (
+            user_profile_serializer.is_valid()
+            and customer_profile_serializer.is_valid()
+            and custom_user_image_serializer.is_valid()
+        ):
+            user_profile_serializer.save()
+            customer_profile_serializer.save()
+            custom_user_image_serializer.save()
+            return Response(
+                {"message": "Profile updated successfully"}, status=status.HTTP_200_OK
+            )
+        else:
+            errors = {
+                **user_profile_serializer.errors,
+                **customer_profile_serializer.errors,
+                **custom_user_image_serializer.errors,
+            }
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)

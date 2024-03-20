@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser
+from api_auth.models import CustomUser, UserProfile, CustomerProfile
 from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -47,3 +47,30 @@ class TokenClaimObtainPairSerializer(TokenObtainPairSerializer):
         token["user"] = user.username
 
         return token
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = "__all__"
+
+
+class CustomerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerProfile
+        fields = "__all__"
+
+
+class CustomUserSerializer(serializers.ModelSerializer):
+    # user_profile = UserProfileSerializer()
+    # customer_profile = CustomerProfileSerializer()
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            "id",
+            "image",
+            # "user_profile",
+            # "customer_profile",
+        ]
+        depth = 1
