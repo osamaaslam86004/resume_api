@@ -28,7 +28,7 @@ urlpatterns = [
     ),
     # check if email is unique
     path("check-email/", CheckEmailExistence.as_view(), name="check_email_existence"),
-    path("login-post/", CustomLoginAPIView.as_view(), name="login-post"),
+    path("login/", CustomLoginAPIView.as_view(), name="login"),
     path("logout/", CustomLogoutView.as_view(), name="logout"),
     path("is-authenticated/", IsAuthenticatedCheck.as_view(), name="is-authenticated"),
 ] + [path("", include(router.urls))]
