@@ -146,8 +146,11 @@ class CustomLoginAPIView(APIView):
 
 
 class CustomLogoutView(APIView):
-    allowed_methods = ["POST"]
+    allowed_methods = ["GET"]
 
-    def post(self, request):
+    def get(self, request):
+        if "user_id" in request.session:
+            user_id = request.session["user_id"]
+            print(f"user_id___________________{user_id}")
         logout(request)
         return Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
