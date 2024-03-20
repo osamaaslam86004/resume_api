@@ -113,7 +113,7 @@ class CheckEmailExistence(APIView):
 
 
 class CustomLoginAPIView(APIView):
-    allowed_methods = ["POST"]
+    allowed_methods = ["POST", "GET"]
     metadata_class = METADATA_JSON_PARSES_JSON_RENDERS
 
     class InputOutputSerializer(serializers.Serializer):
@@ -142,6 +142,26 @@ class CustomLoginAPIView(APIView):
         else:
             return Response(
                 {"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
+            )
+
+    def get(self, request):
+
+        if "user_id" in request.session:
+            user_id = request.session.get("user_id")
+            user = authenticate(request=request, user_id=user_id)
+            if user is not None:
+                login(
+                    request,
+                    user,
+                    backend="django.contrib.auth.backends.ModelBackend",
+                )
+
+                return Response({"user": user}, status=status.HTTP_200_OK)
+            else:
+                return Response({"user": user}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response(
+                {"session": request.session}, status=status.HTTP_404_NOT_FOUND
             )
 
 
