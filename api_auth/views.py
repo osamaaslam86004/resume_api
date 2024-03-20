@@ -1,4 +1,3 @@
-# from django.shortcuts import render
 from rest_framework import viewsets
 from rest_framework.views import APIView
 from api_auth.models import CustomUser, SocialAccount
@@ -7,18 +6,17 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.response import Response
 from rest_framework import status
 
-# from rest_framework.metadata import SimpleMetadata
-# from rest_framework_simplejwt.authentication import JWTStatelessUserAuthentication
-# from rest_framework.permissions import IsAuthenticated
-# from api_auth.custom_meta_data_class import CustomMetadata
-# import jsonschema
-# from jsonschema import ValidationError
+from rest_framework_simplejwt.authentication import JWTStatelessUserAuthentication
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import IsAuthenticated
 from api_auth.schemas import CustomJSONParser, CustomJSONRenderer
-from api_auth.metadata import METADATA_CHECK_EMAIL
+from api_auth.metadata import METADATA_JSON_PARSES_JSON_RENDERS
 from rest_framework.decorators import action
 from rest_framework import serializers
 from django.core.cache import cache
-from datetime import timedelta
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate, login, logout
+import json
 
 
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -76,7 +74,7 @@ class UserCreateView(viewsets.ModelViewSet):
 
 class CheckEmailExistence(APIView):
     allowed_methods = ["POST"]
-    metadata_class = METADATA_CHECK_EMAIL
+    metadata_class = METADATA_JSON_PARSES_JSON_RENDERS
 
     class EmailSerializer(serializers.Serializer):
         email = serializers.EmailField()
@@ -102,48 +100,54 @@ class CheckEmailExistence(APIView):
 
         # Cache the results
         result = {"exists": existing_social_user and existing_user, "email": email}
-        cache.set(cache_key, result, timeout=timedelta(days=1))
+        cache.set(cache_key, result)
 
         if existing_social_user and existing_user:
-            return Response({"exists": True, "email": email}, status=status.HTTP_200_OK)
+            return Response(
+                {"exists": "True", "email": email}, status=status.HTTP_200_OK
+            )
         else:
             return Response(
-                {"exists": False, "email": email}, status=status.HTTP_404_NOT_FOUND
+                {"exists": "False", "email": email}, status=status.HTTP_404_NOT_FOUND
             )
 
 
-# class SignupView(View):
-#     template_name = "signup.html"
-#     form_class = SignUpForm
+class CustomLoginAPIView(APIView):
+    allowed_methods = ["POST"]
+    metadata_class = METADATA_JSON_PARSES_JSON_RENDERS
 
-#     def get(self, request):
-#         form = self.form_class()
-#         return render(request, self.template_name, {"form": form})
+    class InputOutputSerializer(serializers.Serializer):
+        email = serializers.EmailField()
+        password = serializers.CharField()
 
-#     def post(self, request):
-#         email = request.POST.get(
-#             "email"
-#         )  # Assuming the email comes from the form POST data
+    def post(self, request):
+        serializer = self.InputOutputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-#         existing_social_user = SocialAccount.objects.select_related(
-#             user_info__icontains=email
-#         ).exists()
-#         # Check if the user with the email already exists
-#         existing_user = CustomUser.objects.select_related(email=email).exists()
+        email = serializer.validated_data.get("email")
+        password = serializer.validated_data.get("password")
+        user = authenticate(
+            request=request,
+            email=email,
+            password=password,
+            backend="django.contrib.auth.backends.ModelBackend",
+        )
 
-#         if existing_social_user or existing_user:
-#             messages.error(request, "A user with the email already exists")
-#             return redirect("Homepage:signup")
-#         else:
-#             form = self.form_class(request.POST)
-#             if form.is_valid():
-#                 user = form.save()
-#                 if user is not None:
-#                     messages.success(request, "your account is created, Please login!")
-#                     return redirect("Homepage:login")
-#             else:
-#                 for field, errors in form.errors.items():
-#                     for error in errors:
-#                         messages.error(request, f"{field}: {error}")
+        if user is not None:
+            login(request, user)
+            user = self.InputOutputSerializer(request.data).data
+            request.session["user_id"] = CustomUser.objects.filter(email=email)[0].id
+            return Response({"user": user}, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
+            )
 
-#         return render(request, self.template_name, {"form": form})
+
+class CustomLogoutView(APIView):
+    allowed_methods = ["POST"]
+
+    def post(self, request):
+        logout(request)
+        return Response({"message": "Logout successful"}, status=status.HTTP_200_OK)

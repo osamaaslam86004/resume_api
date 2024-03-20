@@ -1,6 +1,12 @@
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
-from api_auth.views import UserCreateView, MyTokenObtainPairView, CheckEmailExistence
+from api_auth.views import (
+    UserCreateView,
+    MyTokenObtainPairView,
+    CheckEmailExistence,
+    CustomLoginAPIView,
+    CustomLogoutView,
+)
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenVerifyView
 
@@ -21,4 +27,6 @@ urlpatterns = [
     ),
     # check if email is unique
     path("check-email/", CheckEmailExistence.as_view(), name="check_email_existence"),
+    path("login-post/", CustomLoginAPIView.as_view(), name="login-post"),
+    path("logout/", CustomLogoutView.as_view(), name="logout"),
 ] + [path("", include(router.urls))]

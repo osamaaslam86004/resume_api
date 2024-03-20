@@ -1,7 +1,7 @@
 from rest_framework.metadata import SimpleMetadata
 
 
-class METADATA_CHECK_EMAIL(SimpleMetadata):
+class METADATA_JSON_PARSES_JSON_RENDERS(SimpleMetadata):
 
     def determine_metadata(self, request, view):
         metadata = {

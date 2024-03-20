@@ -26,7 +26,7 @@ from resume.views import Homepage
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("Homepage", include("Homepage.urls")),
+    path("", include("Homepage.urls")),
     # path("", Homepage.as_view(), name="Homepage"),
     path("api/", include("resume.urls")),
     path("api/auth/", include("api_auth.urls")),
