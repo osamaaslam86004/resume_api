@@ -2,27 +2,24 @@ from rest_framework import viewsets
 from rest_framework.views import APIView
 from api_auth.models import CustomUser, SocialAccount
 from api_auth.serializers import UserSerializer, TokenClaimObtainPairSerializer
+from api_auth.fields import UIDB64TokenField
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.response import Response
 from rest_framework import status
-
-from rest_framework_simplejwt.authentication import JWTStatelessUserAuthentication
-from rest_framework.authentication import SessionAuthentication
-from rest_framework.permissions import IsAuthenticated
 from api_auth.schemas import CustomJSONParser, CustomJSONRenderer
-from api_auth.metadata import METADATA_JSON_PARSES_JSON_RENDERS
+from api_auth.metadata import METADATA_JSON_PARSES_JSON_RENDERS, PasswordResetMetadata
 from rest_framework.decorators import action
 from rest_framework import serializers
 from django.core.cache import cache
-from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
 import json, requests
 from django.conf import settings
-from twilio.rest import Client
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.urls import reverse
+from rest_framework.parsers import JSONParser
+from rest_framework.renderers import JSONRenderer
 
 
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -291,3 +288,46 @@ class CustomPasswordReset(APIView):
             return Response(
                 {"user not found": email}, status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class GetCustomPasswordResetConfirmView(APIView):
+    allowed_methods = ["GET"]
+    metadata_class = PasswordResetMetadata
+    parser_classes = [JSONParser]
+    renderer_classes = [JSONRenderer]
+
+    class InputSerializer(serializers.Serializer):
+        uidb64 = UIDB64TokenField()
+        token = UIDB64TokenField()
+
+    def get(self, request):
+
+        serializer = self.InputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"status": status.HTTP_200_OK})
+
+
+class PostCustomPasswordResetConfirmView(APIView):
+    allowed_methods = ["POST"]
+    metadata_class = PasswordResetMetadata
+    parser_classes = [JSONParser]
+    renderer_classes = [JSONRenderer]
+
+    class OutputSerializer(serializers.Serializer):
+        uidb64 = UIDB64TokenField()
+        token = UIDB64TokenField()
+        password = serializers.CharField()
+
+    def post(self, request):
+
+        serializer = self.OutputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            password = serializer.validated_data["password"]
+            user = serializer.validated_data["user"]
+            user.set_password(password)
+            user.save()
+            return Response({"status": status.HTTP_200_OK})

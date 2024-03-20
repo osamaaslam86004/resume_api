@@ -8,6 +8,8 @@ from api_auth.views import (
     CustomLogoutView,
     IsAuthenticatedCheck,
     CustomPasswordReset,
+    GetCustomPasswordResetConfirmView,
+    PostCustomPasswordResetConfirmView,
 )
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenVerifyView
@@ -34,5 +36,15 @@ urlpatterns = [
     path("is-authenticated/", IsAuthenticatedCheck.as_view(), name="is-authenticated"),
     path(
         "custom-password-reset/", CustomPasswordReset.as_view(), name="password-reset"
+    ),
+    path(
+        "get-password-reset-confirm/",
+        GetCustomPasswordResetConfirmView.as_view(),
+        name="get-password-reset-confirm",
+    ),
+    path(
+        "post-password-reset-confirm/",
+        PostCustomPasswordResetConfirmView.as_view(),
+        name="post-password-reset-confirm",
     ),
 ] + [path("", include(router.urls))]
