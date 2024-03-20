@@ -15,6 +15,28 @@ import os
 from decouple import config
 
 
+# Twilio API
+TEMPLATES_ID = config("template_id")
+ACCOUNT_SID = config("account_sid")
+AUTH_TOKEN = config("auth_token")
+FROM_ = config("from_")
+
+
+# Sendgrid Email API
+SENDGRID_API_KEY = config("SENDGRID_API_KEY")
+CLIENT_EMAIL = config("client_email_address")
+TEMPLATE_ID = config("template_id")
+EMAIL_BACKEND = "sendgrid_backend.SendgridBackend"
+SENDGRID_SANDBOX_MODE_IN_DEBUG = False
+SENDGRID_ECHO_TO_STDOUT = True
+
+# stripe API keys
+PAYMENT_HOST = "https://django-e-commrace.vercel.app/checkout/stripe_webhook"
+PAYMENT_USES_SSL = True
+PUBLISHABLE_KEY = config("Publishable_key")
+STRIPE_SECRET_KEY = config("Secret_Key")
+ENDPOINT_SIGNING_SECRET = config("STRIPE_SIGNING_SECRET")
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 

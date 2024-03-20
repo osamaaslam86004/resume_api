@@ -16,7 +16,13 @@ from rest_framework import serializers
 from django.core.cache import cache
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
-import json
+import json, requests
+from django.conf import settings
+from twilio.rest import Client
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.urls import reverse
 
 
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -199,4 +205,89 @@ class IsAuthenticatedCheck(APIView):
             return Response(
                 {"session not found": "session not found"},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class CustomPasswordReset(APIView):
+    allowed_methods = ["POST"]
+    metadata_class = METADATA_JSON_PARSES_JSON_RENDERS
+
+    class EmailSerializer(serializers.Serializer):
+        email = serializers.EmailField()
+
+    def post(self, request):
+        serializer = self.InputOutputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data.get("email")
+
+        user = CustomUser.objects.filter(email=email)[0]
+
+        if user is not None:
+            try:
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                token = default_token_generator.make_token(user)
+
+                reset_url = request.build_absolute_uri(
+                    reverse(
+                        "Homepage:password_reset_confirm",
+                        kwargs={"uidb64": uid, "token": token},
+                    )
+                )
+
+                # Define the SendGrid API endpoint
+                SENDGRID_API_ENDPOINT = "https://api.sendgrid.com/v3/mail/send"
+
+                # Define your SendGrid API key
+                SENDGRID_API_KEY = settings.SENDGRID_API_KEY
+
+                # Define the email message
+                message = {
+                    "personalizations": [
+                        {"to": [{"email": email}], "subject": "Reset your password"}
+                    ],
+                    "from": {"email": settings.CLIENT_EMAIL},
+                    "content": [
+                        {
+                            "type": "text/html",
+                            "value": f'Click the link to reset your password: <a href="{reset_url}">{reset_url}</a>',
+                        }
+                    ],
+                }
+                # Convert the message to JSON format
+                message_json = json.dumps(message)
+
+                # Set the headers with the API key
+                headers = {
+                    "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                    "Content-Type": "application/json",
+                }
+
+                # Send the email using the requests library
+                response = requests.post(
+                    SENDGRID_API_ENDPOINT,
+                    headers=headers,
+                    data=message_json,
+                    verify=False,
+                )
+
+                print(response.status_code)
+                print(response.content)
+
+                if response.status_code == 202:
+                    return Response({"status": "ok"}, status=status.HTTP_200_OK)
+                else:
+                    return Response(
+                        {"status": "failed"}, status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            except requests.exceptions.RequestException as e:
+                return Response(
+                    {"message": f"Error: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+        else:
+            return Response(
+                {"user not found": email}, status=status.HTTP_400_BAD_REQUEST
             )
