@@ -10,6 +10,8 @@ from api_auth.views import (
     CustomPasswordReset,
     GetCustomPasswordResetConfirmView,
     PostCustomPasswordResetConfirmView,
+    CreateCustomerProfilePageAPIView,
+    GetCustomerProfilePageAPIView,
 )
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenVerifyView
@@ -46,5 +48,15 @@ urlpatterns = [
         "post-password-reset-confirm/",
         PostCustomPasswordResetConfirmView.as_view(),
         name="post-password-reset-confirm",
+    ),
+    path(
+        "post-customer-profile/",
+        CreateCustomerProfilePageAPIView.as_view(),
+        name="post-customer-profile",
+    ),
+    path(
+        "get-customer-profile/",
+        GetCustomerProfilePageAPIView.as_view(),
+        name="get-customer-profile",
     ),
 ] + [path("", include(router.urls))]

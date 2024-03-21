@@ -2,6 +2,8 @@ from rest_framework import serializers
 from api_auth.models import CustomUser, UserProfile, CustomerProfile
 from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from phonenumber_field.serializerfields import PhoneNumberField
+from django_countries.serializers import CountryFieldMixin
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -49,10 +51,27 @@ class TokenClaimObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
 
-class UserProfileSerializer(serializers.ModelSerializer):
+class CustomUserImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ["image"]
+
+
+class UserProfileSerializer(serializers.ModelSerializer, CountryFieldMixin):
+    phone_number = PhoneNumberField()
+
     class Meta:
         model = UserProfile
-        fields = "__all__"
+        fields = [
+            "full_name",
+            "age",
+            "gender",
+            "phone_number",
+            "city",
+            "country",
+            "postal_code",
+            "shipping_address",
+        ]
 
 
 class CustomerProfileSerializer(serializers.ModelSerializer):

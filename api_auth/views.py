@@ -1,11 +1,17 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.views import APIView
-from api_auth.models import CustomUser, UserProfile, CustomerProfile
+from api_auth.models import CustomUser, UserProfile, CustomerProfile, SocialAccount
 from api_auth.serializers import (
-    UserSerializer,
     TokenClaimObtainPairSerializer,
-    CustomerProfile,
+    UserSerializer,
+    CustomUserSerializer,
+    UserProfileSerializer,
+    CustomerProfileSerializer,
+    CustomUserImageSerializer,
 )
+from api_auth.permissions import HasCustomerProfilePermission
+from rest_framework.permissions import IsAuthenticated
 from api_auth.fields import UIDB64TokenField
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.response import Response
@@ -24,6 +30,8 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.urls import reverse
 from rest_framework.parsers import JSONParser
 from rest_framework.renderers import JSONRenderer
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.utils.decorators import method_decorator
 
 
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -337,60 +345,65 @@ class PostCustomPasswordResetConfirmView(APIView):
             return Response({"status": status.HTTP_200_OK})
 
 
-from django.shortcuts import get_object_or_404
-from .models import CustomUser, UserProfile, CustomerProfile
-from .serializers import (
-    CustomUserSerializer,
-    UserProfileSerializer,
-    CustomerProfileSerializer,
-)
-
-
-class CustomerProfilePageAPIView(APIView):
-    serializer_class = UserProfile
-    permission_classes = [IsAuthenticated, IsCustomer]
+class GetCustomerProfilePageAPIView(APIView):
+    parser_classes = [JSONParser]
+    renderer_classes = [JSONRenderer]
+    permission_classes = [IsAuthenticated, HasCustomerProfilePermission]
 
     def get(self, request):
-        # Fetch user data
         user = request.user
         user = get_object_or_404(
             CustomUser.objects.select_related("user_profile", "customer_profile"),
             pk=request.user.pk,
         )
 
-        # Serialize data
         serializer = CustomUserSerializer(user)
 
         return Response(serializer.data)
 
-        # Prepare response data
-        response_data = {
-            "user_profile": user_profile_serializer.data,
-            "customer_profile": customer_profile_serializer.data,
-            "custom_user_image": custom_user_image_serializer.data,
-        }
 
-        return Response(response_data)
+class CreateCustomerProfilePageAPIView(APIView):
+    serializer_class = [
+        UserProfileSerializer,
+        CustomerProfileSerializer,
+        CustomUserImageSerializer,
+    ]
+    parser_classes = [JSONParser]
+    renderer_classes = [JSONRenderer]
+    # permission_classes = [IsAuthenticated]
 
     def post(self, request):
         # Fetch user data
         user = request.user
-        custom_user = CustomUser.objects.get(pk=user.pk)
-        user_profile = UserProfile.objects.get(user=user)
-        customer_profile = CustomerProfile.objects.get(customer_profile=user_profile)
+        user = CustomUser.objects.get(pk=1)
+
+        user_profile, created_user_profile = UserProfile.objects.get_or_create(
+            user=user
+        )
+
+        customer_profile, created_customer_profile = (
+            CustomerProfile.objects.get_or_create(
+                customer_profile=user_profile, customuser_type_1=user
+            )
+        )
 
         # Deserialize request data
-        user_profile_serializer = UserProfileSerializer(
+        user_profile_serializer = self.serializer_class[0](
             instance=user_profile, data=request.data.get("user_profile")
         )
-        customer_profile_serializer = CustomerProfileSerializer(
-            instance=customer_profile, data=request.data.get("customer_profile")
+        customer_profile_serializer = self.serializer_class[1](
+            instance=customer_profile,
+            data=request.data.get("customer_profile"),
         )
-        custom_user_image_serializer = CustomUserImageSerializer(
-            instance=custom_user, data=request.data.get("custom_user_image")
+        custom_user_image_serializer = self.serializer_class[2](
+            instance=user, data=request.data.get("custom_user_image"), partial=True
         )
 
         # Validate and save data
+        user_profile_valid = user_profile_serializer.is_valid()
+        customer_profile_valid = customer_profile_serializer.is_valid()
+        custom_user_image_valid = custom_user_image_serializer.is_valid()
+
         if (
             user_profile_serializer.is_valid()
             and customer_profile_serializer.is_valid()
