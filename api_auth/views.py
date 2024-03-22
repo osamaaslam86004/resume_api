@@ -32,6 +32,8 @@ from rest_framework.parsers import JSONParser
 from rest_framework.renderers import JSONRenderer
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
+from api_auth.authentication import CSRFTrustedOriginAuthentication
+from rest_framework.exceptions import ParseError
 
 
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -40,9 +42,10 @@ class MyTokenObtainPairView(TokenObtainPairView):
 
 class UserCreateView(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
+    allowed_methods = ["POST", "GET"]
     serializer_class = UserSerializer
+    authentication_classes = [CSRFTrustedOriginAuthentication]
     parser_classes = [CustomJSONParser]
-    # renderer_classes = [CustomJSONRenderer]
 
     def list(self, request, *args, **kwargs):
         return Response(data={"error": "Method not allowed"})
@@ -349,20 +352,45 @@ class GetCustomerProfilePageAPIView(APIView):
     parser_classes = [JSONParser]
     renderer_classes = [JSONRenderer]
     permission_classes = [IsAuthenticated, HasCustomerProfilePermission]
+    allowed_methods = ["GET"]
+    serializer_class = [
+        UserProfileSerializer,
+        CustomerProfileSerializer,
+        CustomUserImageSerializer,
+    ]
 
     def get(self, request):
+        # Fetch user data
         user = request.user
-        user = get_object_or_404(
-            CustomUser.objects.select_related("user_profile", "customer_profile"),
-            pk=request.user.pk,
+        user = CustomUser.objects.get(pk=request.user.id)
+
+        user_profile, created_user_profile = UserProfile.objects.get_or_create(
+            user=user
         )
 
-        serializer = CustomUserSerializer(user)
+        customer_profile, created_customer_profile = (
+            CustomerProfile.objects.get_or_create(
+                customer_profile=user_profile, customuser_type_1=user
+            )
+        )
 
-        return Response(serializer.data)
+        # Deserialize request data
+        user_profile_serializer = self.serializer_class[0](data=user_profile)
+        customer_profile_serializer = self.serializer_class[1](data=customer_profile)
+        custom_user_image_serializer = self.serializer_class[2](data=request.user.image)
+
+        return Response(
+            {
+                "image": custom_user_image_serializer,
+                "user_profile": user_profile_serializer,
+                "customer_profile": customer_profile_serializer,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class CreateCustomerProfilePageAPIView(APIView):
+    allowed_methods = ["POST"]
     serializer_class = [
         UserProfileSerializer,
         CustomerProfileSerializer,
@@ -370,12 +398,12 @@ class CreateCustomerProfilePageAPIView(APIView):
     ]
     parser_classes = [JSONParser]
     renderer_classes = [JSONRenderer]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         # Fetch user data
         user = request.user
-        user = CustomUser.objects.get(pk=1)
+        user = CustomUser.objects.get(pk=request.user.id)
 
         user_profile, created_user_profile = UserProfile.objects.get_or_create(
             user=user

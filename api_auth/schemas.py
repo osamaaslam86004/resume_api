@@ -29,7 +29,7 @@ class CustomJSONParser(JSONParser):
         "required": ["password1", "password2", "username", "email", "user_type"],
     }
 
-    def parse(self, stream, media_type=None, parser_context=None):
+    def parse(self, stream, media_type="application/json", parser_context=None):
         """
         Parses the incoming bytestream as JSON, returning the data
         """
@@ -40,18 +40,21 @@ class CustomJSONParser(JSONParser):
         try:
             jsonschema.validate(data, self.user_create_request_schema)
         except jsonschema.ValidationError as e:
-            raise ParseError(detail=str(e))
+            raise ParseError(str(e))
 
         except jsonschema.SchemaError as e:
-            raise ParseError(detail=str(e))
+            raise ParseError(str(e))
 
         return data
 
 
 class CustomJSONRenderer(JSONRenderer):
-    user_create_response_schema = {
+    options_request_schema = {
+        "title": "CustomUser",
         "type": "object",
         "properties": {
+            "password1": {"type": "string"},
+            "password2": {"type": "string"},
             "username": {"type": "string"},
             "email": {"type": "string", "format": "email"},
             "user_type": {
@@ -70,18 +73,20 @@ class CustomJSONRenderer(JSONRenderer):
         "required": ["username", "email", "user_type"],
     }
 
-    def render(self, data, accepted_media_type=None, renderer_context=None):
+    def render(
+        self, data, accepted_media_type="application/json", renderer_context=None
+    ):
         # Call the parent class' render method to obtain the rendered JSON data
-        rendered_data = super().render(data, accepted_media_type, renderer_context)
+        data = super().render(data, accepted_media_type, renderer_context)
 
         # Validate the rendered JSON data against the schema
         try:
-            jsonschema.validate(data, self.user_create_response_schema)
+            jsonschema.validate(data, self.options_request_schema)
         except jsonschema.ValidationError as e:
             # If validation fails, raise a ValidationError
-            raise jsonschema.ValidationError(detail=str(e))
+            raise ParseError(str(e))
         except jsonschema.SchemaError as e:
             # If schema error occurs, raise a SchemaError
-            raise jsonschema.SchemaError(detail=str(e))
+            raise ParseError(str(e))
 
-        return rendered_data
+        return data
