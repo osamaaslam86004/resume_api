@@ -51,13 +51,14 @@ class TokenClaimObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
 
-class CustomUserImageSerializer(serializers.ModelSerializer):
+class CustomUserImageSerializer(serializers.Serializer):
+    image = serializers.URLField()
+
     class Meta:
-        model = CustomUser
         fields = ["image"]
 
 
-class UserProfileSerializer(serializers.ModelSerializer, CountryFieldMixin):
+class UserProfileSerializer(CountryFieldMixin, serializers.ModelSerializer):
     phone_number = PhoneNumberField()
 
     class Meta:

@@ -34,6 +34,26 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from api_auth.authentication import CSRFTrustedOriginAuthentication
 from rest_framework.exceptions import ParseError
+from django.db import transaction
+
+
+import cloudinary
+
+if not settings.DEBUG:
+    cloudinary.config(
+        cloud_name="dh8vfw5u0",
+        api_key="667912285456865",
+        api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8",
+        api_proxy="http://proxy.server:3128",
+    )
+else:
+    cloudinary.config(
+        cloud_name="dh8vfw5u0",
+        api_key="667912285456865",
+        api_secret="QaF0OnEY-W1v2GufFKdOjo3KQm8",
+    )
+import cloudinary.uploader
+from cloudinary.uploader import upload
 
 
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -213,6 +233,16 @@ class IsAuthenticatedCheck(APIView):
                     {"user_authenticated": user_authenticated},
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
+        elif request.user.is_authenticated:
+            return Response(
+                {"is_authenticated": request.user.is_authenticated},
+                status=status.HTTP_200_OK,
+            )
+        elif not request.user.is_authenticated:
+            return Response(
+                {"is_authenticated": request.user.is_authenticated},
+                status=status.HTTP_200_OK,
+            )
         else:
             return Response(
                 {"session not found": "session not found"},
@@ -349,6 +379,11 @@ class PostCustomPasswordResetConfirmView(APIView):
 
 
 class GetCustomerProfilePageAPIView(APIView):
+    permission_required = [
+        "api_auth.customer_create_profile",
+        "api_auth.customer_edit_profile",
+        "api_auth.customer_delete_profile",
+    ]
     parser_classes = [JSONParser]
     renderer_classes = [JSONRenderer]
     permission_classes = [IsAuthenticated, HasCustomerProfilePermission]
@@ -375,21 +410,34 @@ class GetCustomerProfilePageAPIView(APIView):
         )
 
         # Deserialize request data
-        user_profile_serializer = self.serializer_class[0](data=user_profile)
-        customer_profile_serializer = self.serializer_class[1](data=customer_profile)
-        custom_user_image_serializer = self.serializer_class[2](data=request.user.image)
+        user_profile_serializer = self.serializer_class[0](instance=user_profile).data
+        customer_profile_serializer = self.serializer_class[1](
+            instance=customer_profile
+        ).data
+        custom_user_image_serializer = self.serializer_class[2](
+            instance=request.user
+        ).data
 
         return Response(
             {
                 "image": custom_user_image_serializer,
                 "user_profile": user_profile_serializer,
                 "customer_profile": customer_profile_serializer,
+                "permissions": [
+                    Permissions.split(".")[1]
+                    for Permissions in user.get_all_permissions()
+                ],
             },
             status=status.HTTP_200_OK,
         )
 
 
 class CreateCustomerProfilePageAPIView(APIView):
+    permission_required = [
+        "api_auth.customer_create_profile",
+        "api_auth.customer_edit_profile",
+        "api_auth.customer_delete_profile",
+    ]
     allowed_methods = ["POST"]
     serializer_class = [
         UserProfileSerializer,
@@ -398,7 +446,7 @@ class CreateCustomerProfilePageAPIView(APIView):
     ]
     parser_classes = [JSONParser]
     renderer_classes = [JSONRenderer]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasCustomerProfilePermission]
 
     def post(self, request):
         # Fetch user data
@@ -415,38 +463,60 @@ class CreateCustomerProfilePageAPIView(APIView):
             )
         )
 
-        # Deserialize request data
-        user_profile_serializer = self.serializer_class[0](
-            instance=user_profile, data=request.data.get("user_profile")
-        )
-        customer_profile_serializer = self.serializer_class[1](
-            instance=customer_profile,
-            data=request.data.get("customer_profile"),
-        )
-        custom_user_image_serializer = self.serializer_class[2](
-            instance=user, data=request.data.get("custom_user_image"), partial=True
-        )
+        transformation_options = {
+            "width": 75,
+            "height": 75,
+            "crop": "fill",
+            "gravity": "face",
+            "effect": "auto_contrast",
+        }
+        try:
+            with transaction.atomic():
+                image_data = upload(
+                    file=request.FILES["image"],
+                    transformation=transformation_options,
+                    resource_type="image",
+                )
 
-        # Validate and save data
-        user_profile_valid = user_profile_serializer.is_valid()
-        customer_profile_valid = customer_profile_serializer.is_valid()
-        custom_user_image_valid = custom_user_image_serializer.is_valid()
+                self.request.user.image = image_data["url"]
+                self.request.user.save()
 
-        if (
-            user_profile_serializer.is_valid()
-            and customer_profile_serializer.is_valid()
-            and custom_user_image_serializer.is_valid()
-        ):
-            user_profile_serializer.save()
-            customer_profile_serializer.save()
-            custom_user_image_serializer.save()
-            return Response(
-                {"message": "Profile updated successfully"}, status=status.HTTP_200_OK
+            user_profile_serializer = self.serializer_class[0](
+                instance=user_profile, data=request.data.get("user_profile")
             )
-        else:
-            errors = {
-                **user_profile_serializer.errors,
-                **customer_profile_serializer.errors,
-                **custom_user_image_serializer.errors,
-            }
-            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+            customer_profile_serializer = self.serializer_class[1](
+                instance=customer_profile,
+                data=request.data.get("customer_profile"),
+            )
+            custom_user_image_serializer = self.serializer_class[2](
+                instance=user, data=request.data.get("custom_user_image"), partial=True
+            )
+
+            # Validate and save data
+            user_profile_valid = user_profile_serializer.is_valid()
+            customer_profile_valid = customer_profile_serializer.is_valid()
+            custom_user_image_valid = custom_user_image_serializer.is_valid()
+
+            if (
+                user_profile_serializer.is_valid()
+                and customer_profile_serializer.is_valid()
+                and custom_user_image_serializer.is_valid()
+            ):
+                user_profile_serializer.save()
+                customer_profile_serializer.save()
+                custom_user_image_serializer.save()
+                return Response(
+                    {"message": "Profile updated successfully"},
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                errors = {
+                    **user_profile_serializer.errors,
+                    **customer_profile_serializer.errors,
+                    **custom_user_image_serializer.errors,
+                }
+                return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
