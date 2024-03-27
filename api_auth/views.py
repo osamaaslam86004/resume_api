@@ -478,8 +478,9 @@ class CreateCustomerProfilePageAPIView(APIView):
                     resource_type="image",
                 )
 
-                self.request.user.image = image_data["url"]
-                self.request.user.save()
+                # self.request.user.image = image_data["url"]
+                # self.request.user.save()
+                custom_user_image = image_data["url"]
 
             user_profile_serializer = self.serializer_class[0](
                 instance=user_profile, data=request.data.get("user_profile")
@@ -488,8 +489,11 @@ class CreateCustomerProfilePageAPIView(APIView):
                 instance=customer_profile,
                 data=request.data.get("customer_profile"),
             )
+            # custom_user_image_serializer = self.serializer_class[2](
+            #     instance=user, data=request.data.get("custom_user_image"), partial=True
+            # )
             custom_user_image_serializer = self.serializer_class[2](
-                instance=user, data=request.data.get("custom_user_image"), partial=True
+                instance=user, data=custom_user_image, partial=True
             )
 
             # Validate and save data
